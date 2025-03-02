@@ -1,0 +1,1303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kelly Criterion Calculator</title>
+    <link href="https://cdn.jsdelivr.net/npm/flowbite@1.6.5/dist/flowbite.min.css" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#5D5CDE'
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-200 min-h-screen">
+    <!-- Fullscreen Modal Overlay for Charts -->
+    <div id="chart-modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center hidden">
+        <div class="bg-white dark:bg-gray-800 rounded-lg p-4 max-w-5xl w-full mx-4 max-h-[90vh] flex flex-col">
+            <div class="flex justify-between items-center mb-4">
+                <h3 id="modal-title" class="text-xl font-semibold text-gray-800 dark:text-white"></h3>
+                <button id="close-modal-btn" class="text-gray-700 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 p-2 rounded-lg focus:outline-none">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+            <div class="flex-grow overflow-auto">
+                <div class="bg-gray-100 dark:bg-gray-700 p-2 rounded-lg h-full">
+                    <canvas id="fullscreen-chart" width="800" height="500"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="container mx-auto px-4 py-8 max-w-4xl">
+        <div class="flex justify-between items-center mb-8">
+            <h1 class="text-3xl font-bold text-primary dark:text-primary">Kelly Criterion Calculator</h1>
+            <button id="dark-mode-toggle" class="p-2 rounded-lg text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 focus:outline-none">
+                <svg id="sun-icon" class="w-6 h-6 hidden dark:block" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z"/>
+                </svg>
+                <svg id="moon-icon" class="w-6 h-6 block dark:hidden" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z"/>
+                </svg>
+            </button>
+        </div>
+        <p class="text-center mb-8 text-gray-600 dark:text-gray-400">Calculate the optimal bet size for long-term bankroll growth</p>
+
+        <!-- Tabs Navigation -->
+        <div class="border-b border-gray-200 dark:border-gray-700 mb-6">
+            <ul class="flex flex-wrap -mb-px" id="tabs" role="tablist">
+                <li class="mr-2" role="presentation">
+                    <button class="inline-block p-4 border-b-2 border-primary text-primary rounded-t-lg active" id="calculator-tab" data-tabs-target="#calculator" type="button" role="tab" aria-controls="calculator" aria-selected="true">
+                        Calculator
+                    </button>
+                </li>
+                <li class="mr-2" role="presentation">
+                    <button class="inline-block p-4 border-b-2 border-transparent hover:text-primary hover:border-primary rounded-t-lg" id="simulation-tab" data-tabs-target="#simulation" type="button" role="tab" aria-controls="simulation" aria-selected="false">
+                        Monte Carlo Simulation
+                    </button>
+                </li>
+            </ul>
+        </div>
+
+        <!-- Tab Content -->
+        <div id="tab-content">
+            <!-- Calculator Tab -->
+            <div class="grid md:grid-cols-2 gap-8 block" id="calculator" role="tabpanel" aria-labelledby="calculator-tab">
+                <!-- Calculator Section -->
+                <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
+                    <h2 class="text-xl font-semibold mb-4 text-gray-800 dark:text-white">Calculator</h2>
+
+                    <form id="kelly-form" class="space-y-4">
+                        <div class="relative">
+                            <label for="f-input" class="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                                Fraction to bet (f)
+                                <span class="ml-1 text-xs text-gray-500 dark:text-gray-400" title="The fraction of your bankroll to wager (0 to 1)">ⓘ</span>
+                            </label>
+                            <input type="number" id="f-input" step="0.01" min="0" max="1" placeholder="e.g., 0.25"
+                                class="bg-gray-50 border border-gray-300 text-gray-900 text-base rounded-lg focus:ring-primary focus:border-primary block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white">
+                        </div>
+
+                        <div class="relative">
+                            <label for="b-input" class="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                                Net odds (b)
+                                <span class="ml-1 text-xs text-gray-500 dark:text-gray-400" title="The net odds received on the wager (e.g., 1.0 for 1:1 odds)">ⓘ</span>
+                            </label>
+                            <input type="number" id="b-input" step="0.1" min="0" placeholder="e.g., 1.0"
+                                class="bg-gray-50 border border-gray-300 text-gray-900 text-base rounded-lg focus:ring-primary focus:border-primary block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white">
+                        </div>
+
+                        <div class="relative">
+                            <label for="p-input" class="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                                Probability of winning (p)
+                                <span class="ml-1 text-xs text-gray-500 dark:text-gray-400" title="The probability of winning (0 to 1)">ⓘ</span>
+                            </label>
+                            <input type="number" id="p-input" step="0.01" min="0" max="1" placeholder="e.g., 0.6"
+                                class="bg-gray-50 border border-gray-300 text-gray-900 text-base rounded-lg focus:ring-primary focus:border-primary block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white">
+                        </div>
+
+                        <div class="relative">
+                            <label for="q-input" class="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                                Probability of losing (q)
+                                <span class="ml-1 text-xs text-gray-500 dark:text-gray-400" title="The probability of losing (0 to 1), calculated as 1 - p">ⓘ</span>
+                            </label>
+                            <input type="number" id="q-input" step="0.01" min="0" max="1" placeholder="e.g., 0.4"
+                                class="bg-gray-50 border border-gray-300 text-gray-900 text-base rounded-lg focus:ring-primary focus:border-primary block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white">
+                        </div>
+
+                        <div class="flex justify-between space-x-4">
+                            <button type="button" id="calculate-btn" class="w-full text-white bg-primary hover:bg-opacity-90 focus:ring-4 focus:outline-none focus:ring-primary/50 font-medium rounded-lg text-base px-5 py-2.5 text-center dark:bg-primary dark:hover:bg-opacity-90">
+                                Calculate
+                            </button>
+                            <button type="button" id="reset-btn" class="w-auto text-gray-700 bg-gray-200 hover:bg-gray-300 focus:ring-4 focus:outline-none focus:ring-gray-300/50 font-medium rounded-lg text-base px-5 py-2.5 text-center dark:text-white dark:bg-gray-700 dark:hover:bg-gray-600">
+                                Reset
+                            </button>
+                        </div>
+                    </form>
+
+                    <div id="result" class="mt-6 p-4 bg-gray-100 dark:bg-gray-700 rounded-lg hidden">
+                        <h3 class="text-lg font-semibold text-gray-800 dark:text-white">Result</h3>
+                        <p id="result-text" class="mt-2 text-gray-800 dark:text-white"></p>
+                        <p id="result-warning" class="mt-2 text-yellow-600 dark:text-yellow-400 hidden"></p>
+                    </div>
+
+                    <div id="error" class="mt-6 p-4 bg-red-100 dark:bg-red-900/30 rounded-lg text-red-700 dark:text-red-400 hidden">
+                        <p id="error-text"></p>
+                    </div>
+                </div>
+
+                <!-- Educational Section -->
+                <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
+                    <h2 class="text-xl font-semibold mb-4 text-gray-800 dark:text-white">What is the Kelly Criterion?</h2>
+
+                    <div class="space-y-4">
+                        <div>
+                            <h3 class="font-medium text-gray-800 dark:text-white">The Formula</h3>
+                            <div class="mt-2 p-3 bg-gray-100 dark:bg-gray-700 rounded-lg">
+                                <p class="text-center font-medium text-primary dark:text-primary">f = (b × p - q) / b</p>
+                            </div>
+                            <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">Where:</p>
+                            <ul class="list-disc pl-5 mt-1 text-sm text-gray-600 dark:text-gray-400">
+                                <li><strong>f</strong> = Fraction of bankroll to bet</li>
+                                <li><strong>b</strong> = Net odds received on wager (decimal)</li>
+                                <li><strong>p</strong> = Probability of winning (0 to 1)</li>
+                                <li><strong>q</strong> = Probability of losing (equals 1 - p)</li>
+                            </ul>
+                        </div>
+
+                        <div>
+                            <h3 class="font-medium text-gray-800 dark:text-white">Variable Definitions</h3>
+                            <ul class="list-disc pl-5 mt-1 text-sm text-gray-600 dark:text-gray-400">
+                                <li><strong>Fraction (f):</strong> The proportion of your bankroll to wager (e.g., 0.25 means bet 25% of your bankroll)</li>
+                                <li><strong>Net odds (b):</strong> The payout multiple minus 1 (e.g., b = 1.0 means you receive $2 for every $1 bet if you win, or "2:1 odds")</li>
+                                <li><strong>Probability (p):</strong> Your estimated probability of winning (e.g., p = 0.6 means a 60% chance to win)</li>
+                            </ul>
+                        </div>
+
+                        <div>
+                            <h3 class="font-medium text-gray-800 dark:text-white">Use Cases</h3>
+                            <ul class="list-disc pl-5 mt-1 text-sm text-gray-600 dark:text-gray-400">
+                                <li>The Kelly Criterion helps determine the optimal bet size for maximizing long-term bankroll growth</li>
+                                <li>It's used in sports betting, gambling, and financial investing</li>
+                                <li>The formula balances potential rewards against the risk of ruin</li>
+                                <li>Many professional bettors use a "fractional Kelly" (e.g., Half-Kelly) to reduce volatility</li>
+                            </ul>
+                        </div>
+
+                        <div>
+                            <h3 class="font-medium text-gray-800 dark:text-white">Important Notes</h3>
+                            <ul class="list-disc pl-5 mt-1 text-sm text-gray-600 dark:text-gray-400">
+                                <li>If f ≤ 0: Don't bet (no edge)</li>
+                                <li>If f ≥ 1: Be extremely cautious (high risk of ruin)</li>
+                                <li>Overbetting (exceeding the Kelly recommendation) substantially increases the risk of ruin</li>
+                                <li>The formula assumes your probability estimate is accurate</li>
+                            </ul>
+                        </div>
+
+                        <div>
+                            <h3 class="font-medium text-gray-800 dark:text-white">Example</h3>
+                            <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                                Suppose you have a bet with 60% chance of winning (p = 0.6) at even money odds (b = 1.0).<br>
+                                Using the Kelly formula: f = (1.0 × 0.6 - 0.4) / 1.0 = 0.2<br>
+                                The optimal Kelly bet would be 20% of your bankroll.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Monte Carlo Simulation Tab -->
+            <div class="hidden" id="simulation" role="tabpanel" aria-labelledby="simulation-tab">
+                <div class="grid md:grid-cols-2 gap-8">
+                    <!-- Simulation Inputs Section -->
+                    <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
+                        <h2 class="text-xl font-semibold mb-4 text-gray-800 dark:text-white">Simulation Parameters</h2>
+
+                        <form id="simulation-form" class="space-y-4">
+                            <div class="relative">
+                                <label for="initial-bankroll" class="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                                    Initial Bankroll ($)
+                                    <span class="ml-1 text-xs text-gray-500 dark:text-gray-400" title="The starting amount of money">ⓘ</span>
+                                </label>
+                                <input type="number" id="initial-bankroll" min="1" placeholder="e.g., 1000" value="1000"
+                                    class="bg-gray-50 border border-gray-300 text-gray-900 text-base rounded-lg focus:ring-primary focus:border-primary block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white">
+                            </div>
+
+                            <div class="relative">
+                                <label for="num-bets" class="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                                    Number of Bets/Investments
+                                    <span class="ml-1 text-xs text-gray-500 dark:text-gray-400" title="The total number of bets to simulate">ⓘ</span>
+                                </label>
+                                <input type="number" id="num-bets" min="1" max="1000" placeholder="e.g., 100" value="100"
+                                    class="bg-gray-50 border border-gray-300 text-gray-900 text-base rounded-lg focus:ring-primary focus:border-primary block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white">
+                            </div>
+
+                            <div class="relative">
+                                <label for="num-simulations" class="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                                    Number of Simulations
+                                    <span class="ml-1 text-xs text-gray-500 dark:text-gray-400" title="The number of independent simulations to run (higher = more accurate but slower)">ⓘ</span>
+                                </label>
+                                <input type="number" id="num-simulations" min="1" max="10000" placeholder="e.g., 1000" value="1000"
+                                    class="bg-gray-50 border border-gray-300 text-gray-900 text-base rounded-lg focus:ring-primary focus:border-primary block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white">
+                            </div>
+
+                            <div class="relative">
+                                <label for="kelly-fraction" class="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                                    Kelly Fraction (Optional)
+                                    <span class="ml-1 text-xs text-gray-500 dark:text-gray-400" title="The fraction of the calculated Kelly bet to use (e.g., 0.5 for Half Kelly). Leave blank to use the full Kelly value.">ⓘ</span>
+                                </label>
+                                <input type="number" id="kelly-fraction" step="0.01" min="0" max="2" placeholder="e.g., 0.5 for Half Kelly"
+                                    class="bg-gray-50 border border-gray-300 text-gray-900 text-base rounded-lg focus:ring-primary focus:border-primary block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white">
+                            </div>
+
+                            <div class="relative">
+                                <label for="target-bankroll" class="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                                    Target Bankroll ($, Optional)
+                                    <span class="ml-1 text-xs text-gray-500 dark:text-gray-400" title="A target bankroll to calculate the probability of reaching">ⓘ</span>
+                                </label>
+                                <input type="number" id="target-bankroll" min="1" placeholder="e.g., 2000"
+                                    class="bg-gray-50 border border-gray-300 text-gray-900 text-base rounded-lg focus:ring-primary focus:border-primary block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white">
+                            </div>
+
+                            <div class="flex justify-between space-x-4">
+                                <button type="button" id="run-simulation-btn" class="w-full text-white bg-primary hover:bg-opacity-90 focus:ring-4 focus:outline-none focus:ring-primary/50 font-medium rounded-lg text-base px-5 py-2.5 text-center dark:bg-primary dark:hover:bg-opacity-90">
+                                    Run Simulation
+                                </button>
+                                <button type="button" id="reset-simulation-btn" class="w-auto text-gray-700 bg-gray-200 hover:bg-gray-300 focus:ring-4 focus:outline-none focus:ring-gray-300/50 font-medium rounded-lg text-base px-5 py-2.5 text-center dark:text-white dark:bg-gray-700 dark:hover:bg-gray-600">
+                                    Reset
+                                </button>
+                            </div>
+                        </form>
+
+                        <div id="simulation-error" class="mt-6 p-4 bg-red-100 dark:bg-red-900/30 rounded-lg text-red-700 dark:text-red-400 hidden">
+                            <p id="simulation-error-text"></p>
+                        </div>
+
+                        <div id="simulation-progress" class="mt-6 hidden">
+                            <label for="simulation-progress-bar" class="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                                Simulation Progress
+                            </label>
+                            <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5 mb-4">
+                                <div id="simulation-progress-bar" class="bg-primary h-2.5 rounded-full" style="width: 0%"></div>
+                            </div>
+                            <p id="simulation-progress-text" class="text-sm text-gray-600 dark:text-gray-400">0%</p>
+                        </div>
+                    </div>
+
+                    <!-- Simulation Results Section -->
+                    <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md hidden" id="simulation-results">
+                        <h2 class="text-xl font-semibold mb-4 text-gray-800 dark:text-white">Simulation Results</h2>
+
+                        <div class="mb-6">
+                            <h3 class="font-medium text-gray-800 dark:text-white mb-2">Summary Statistics</h3>
+                            <div class="bg-gray-100 dark:bg-gray-700 p-4 rounded-lg">
+                                <div class="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <p class="text-sm text-gray-600 dark:text-gray-400">Initial Bankroll:</p>
+                                        <p id="summary-initial" class="font-semibold text-gray-800 dark:text-white">$1,000.00</p>
+                                    </div>
+                                    <div>
+                                        <p class="text-sm text-gray-600 dark:text-gray-400">Kelly Fraction:</p>
+                                        <p id="summary-kelly" class="font-semibold text-gray-800 dark:text-white">20.0%</p>
+                                    </div>
+                                    <div>
+                                        <p class="text-sm text-gray-600 dark:text-gray-400">Average Final:</p>
+                                        <p id="summary-average" class="font-semibold text-gray-800 dark:text-white">$0.00</p>
+                                    </div>
+                                    <div>
+                                        <p class="text-sm text-gray-600 dark:text-gray-400">Median Final:</p>
+                                        <p id="summary-median" class="font-semibold text-gray-800 dark:text-white">$0.00</p>
+                                    </div>
+                                    <div>
+                                        <p class="text-sm text-gray-600 dark:text-gray-400">Standard Deviation:</p>
+                                        <p id="summary-stddev" class="font-semibold text-gray-800 dark:text-white">$0.00</p>
+                                    </div>
+                                    <div id="target-probability-container" class="hidden">
+                                        <p class="text-sm text-gray-600 dark:text-gray-400">Probability of reaching target:</p>
+                                        <p id="summary-target-prob" class="font-semibold text-gray-800 dark:text-white">0.0%</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="space-y-4">
+                            <div class="flex justify-between items-center">
+                                <h3 class="font-medium text-gray-800 dark:text-white">Final Bankroll Distribution</h3>
+                                <button type="button" id="histogram-fullscreen-btn" class="text-gray-700 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 p-1 rounded-lg focus:outline-none">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 4h-4m4 0l-5-5"></path>
+                                    </svg>
+                                </button>
+                            </div>
+                            <div class="bg-gray-100 dark:bg-gray-700 p-2 rounded-lg">
+                                <canvas id="result-histogram" width="400" height="200"></canvas>
+                            </div>
+
+                            <div class="flex justify-between items-center mt-4">
+                                <h3 class="font-medium text-gray-800 dark:text-white">Bankroll Evolution</h3>
+                                <button type="button" id="evolution-fullscreen-btn" class="text-gray-700 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 p-1 rounded-lg focus:outline-none">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 4h-4m4 0l-5-5"></path>
+                                    </svg>
+                                </button>
+                            </div>
+                            <div class="bg-gray-100 dark:bg-gray-700 p-2 rounded-lg">
+                                <canvas id="bankroll-evolution" width="400" height="200"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Main Calculator Elements
+            const formElements = {
+                f: document.getElementById('f-input'),
+                b: document.getElementById('b-input'),
+                p: document.getElementById('p-input'),
+                q: document.getElementById('q-input'),
+                calculateBtn: document.getElementById('calculate-btn'),
+                resetBtn: document.getElementById('reset-btn'),
+                result: document.getElementById('result'),
+                resultText: document.getElementById('result-text'),
+                resultWarning: document.getElementById('result-warning'),
+                error: document.getElementById('error'),
+                errorText: document.getElementById('error-text')
+            };
+
+            // Simulation Elements
+            const simulationElements = {
+                initialBankroll: document.getElementById('initial-bankroll'),
+                numBets: document.getElementById('num-bets'),
+                numSimulations: document.getElementById('num-simulations'),
+                kellyFraction: document.getElementById('kelly-fraction'),
+                targetBankroll: document.getElementById('target-bankroll'),
+                runSimulationBtn: document.getElementById('run-simulation-btn'),
+                resetSimulationBtn: document.getElementById('reset-simulation-btn'),
+                simulationError: document.getElementById('simulation-error'),
+                simulationErrorText: document.getElementById('simulation-error-text'),
+                simulationProgress: document.getElementById('simulation-progress'),
+                simulationProgressBar: document.getElementById('simulation-progress-bar'),
+                simulationProgressText: document.getElementById('simulation-progress-text'),
+                simulationResults: document.getElementById('simulation-results'),
+                summaryInitial: document.getElementById('summary-initial'),
+                summaryKelly: document.getElementById('summary-kelly'),
+                summaryAverage: document.getElementById('summary-average'),
+                summaryMedian: document.getElementById('summary-median'),
+                summaryStddev: document.getElementById('summary-stddev'),
+                targetProbabilityContainer: document.getElementById('target-probability-container'),
+                summaryTargetProb: document.getElementById('summary-target-prob'),
+                resultHistogram: document.getElementById('result-histogram'),
+                bankrollEvolution: document.getElementById('bankroll-evolution')
+            };
+
+            // Tab Elements
+            const tabElements = {
+                calculatorTab: document.getElementById('calculator-tab'),
+                simulationTab: document.getElementById('simulation-tab'),
+                calculator: document.getElementById('calculator'),
+                simulation: document.getElementById('simulation')
+            };
+
+            // Dark Mode Elements
+            const darkModeElements = {
+                darkModeToggle: document.getElementById('dark-mode-toggle'),
+                moonIcon: document.getElementById('moon-icon'),
+                sunIcon: document.getElementById('sun-icon')
+            };
+
+            // Fullscreen Chart Elements
+            const fullscreenElements = {
+                histogramBtn: document.getElementById('histogram-fullscreen-btn'),
+                evolutionBtn: document.getElementById('evolution-fullscreen-btn'),
+                modal: document.getElementById('chart-modal'),
+                closeBtn: document.getElementById('close-modal-btn'),
+                title: document.getElementById('modal-title'),
+                canvas: document.getElementById('fullscreen-chart')
+            };
+
+            // Charts
+            let histogramChart = null;
+            let evolutionChart = null;
+            let fullscreenChart = null;
+
+            // Check for dark mode preference
+            function initDarkMode() {
+                try {
+                    // Try to get preference from localStorage
+                    const storedTheme = localStorage.getItem('color-theme');
+                    if (storedTheme === 'dark') {
+                        document.documentElement.classList.add('dark');
+                        darkModeElements.moonIcon.classList.add('hidden');
+                        darkModeElements.sunIcon.classList.remove('hidden');
+                    } else if (storedTheme === 'light') {
+                        document.documentElement.classList.remove('dark');
+                        darkModeElements.sunIcon.classList.add('hidden');
+                        darkModeElements.moonIcon.classList.remove('hidden');
+                    } else {
+                        // If no preference in localStorage, check system preference
+                        if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+                            document.documentElement.classList.add('dark');
+                            darkModeElements.moonIcon.classList.add('hidden');
+                            darkModeElements.sunIcon.classList.remove('hidden');
+                        } else {
+                            document.documentElement.classList.remove('dark');
+                            darkModeElements.sunIcon.classList.add('hidden');
+                            darkModeElements.moonIcon.classList.remove('hidden');
+                        }
+                    }
+                } catch (e) {
+                    // localStorage is not available
+                    console.warn("localStorage is not available, using system preference:", e);
+                    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+                        document.documentElement.classList.add('dark');
+                        darkModeElements.moonIcon.classList.add('hidden');
+                        darkModeElements.sunIcon.classList.remove('hidden');
+                    } else {
+                        document.documentElement.classList.remove('dark');
+                        darkModeElements.sunIcon.classList.add('hidden');
+                        darkModeElements.moonIcon.classList.remove('hidden');
+                    }
+                }
+            }
+
+            // Initialize dark mode
+            initDarkMode();
+
+            // Setup fullscreen chart functionality
+            setupFullscreenCharts();
+
+            // Set example values
+            function setExampleValues() {
+                formElements.b.value = "1.0";
+                formElements.p.value = "0.6";
+                formElements.q.value = "0.4";
+                formElements.f.value = "";
+            }
+
+            // Set example values on page load
+            setExampleValues();
+
+            // Dark Mode Toggle Functionality
+            darkModeElements.darkModeToggle.addEventListener('click', function() {
+                if (document.documentElement.classList.contains('dark')) {
+                    document.documentElement.classList.remove('dark');
+                    darkModeElements.sunIcon.classList.add('hidden');
+                    darkModeElements.moonIcon.classList.remove('hidden');
+                    try {
+                        localStorage.setItem('color-theme', 'light');
+                    } catch (e) {
+                        console.warn("localStorage is not available, cannot save theme:", e);
+                    }
+                } else {
+                    document.documentElement.classList.add('dark');
+                    darkModeElements.moonIcon.classList.add('hidden');
+                    darkModeElements.sunIcon.classList.remove('hidden');
+                    try {
+                        localStorage.setItem('color-theme', 'dark');
+                    } catch (e) {
+                        console.warn("localStorage is not available, cannot save theme:", e);
+                    }
+                }
+                // Update charts theme if they exist
+                updateChartsTheme();
+            });
+
+            // Update charts theme based on dark mode
+            function updateChartsTheme() {
+                const isDark = document.documentElement.classList.contains('dark');
+                const textColor = isDark ? '#E5E7EB' : '#1F2937';
+                const gridColor = isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
+
+                Chart.defaults.color = textColor;
+                Chart.defaults.borderColor = gridColor;
+
+                if (histogramChart) {
+                    histogramChart.options.scales.x.grid.color = gridColor;
+                    histogramChart.options.scales.y.grid.color = gridColor;
+                    histogramChart.options.scales.x.ticks.color = textColor;
+                    histogramChart.options.scales.y.ticks.color = textColor;
+                    histogramChart.options.scales.x.title.color = textColor;
+                    histogramChart.options.scales.y.title.color = textColor;
+                    histogramChart.update();
+                }
+
+                if (evolutionChart) {
+                    evolutionChart.options.scales.x.grid.color = gridColor;
+                    evolutionChart.options.scales.y.grid.color = gridColor;
+                    evolutionChart.options.scales.x.ticks.color = textColor;
+                    evolutionChart.options.scales.y.ticks.color = textColor;
+                    evolutionChart.options.scales.x.title.color = textColor;
+                    evolutionChart.options.scales.y.title.color = textColor;
+                    evolutionChart.update();
+                }
+
+                if (fullscreenChart) {
+                    fullscreenChart.options.scales.x.grid.color = gridColor;
+                    fullscreenChart.options.scales.y.grid.color = gridColor;
+                    fullscreenChart.options.scales.x.ticks.color = textColor;
+                    fullscreenChart.options.scales.y.ticks.color = textColor;
+                    fullscreenChart.options.scales.x.title.color = textColor;
+                    fullscreenChart.options.scales.y.title.color = textColor;
+                    fullscreenChart.update();
+                }
+            }
+
+            // Fullscreen chart functionality
+            function setupFullscreenCharts() {
+                // Get modal elements after DOM is loaded
+                const modal = document.getElementById('chart-modal');
+                const closeBtn = document.getElementById('close-modal-btn');
+                const histogramBtn = document.getElementById('histogram-fullscreen-btn');
+                const evolutionBtn = document.getElementById('evolution-fullscreen-btn');
+                const modalTitle = document.getElementById('modal-title');
+                const fullscreenCanvas = document.getElementById('fullscreen-chart');
+
+                // Close modal functionality
+                closeBtn.addEventListener('click', function() {
+                    modal.classList.add('hidden');
+                    // Destroy the chart to prevent memory leaks
+                    if (fullscreenChart) {
+                        fullscreenChart.destroy();
+                        fullscreenChart = null;
+                    }
+                });
+
+                // Close on click outside of modal content
+                modal.addEventListener('click', function(e) {
+                    if (e.target === modal) {
+                        modal.classList.add('hidden');
+                        if (fullscreenChart) {
+                            fullscreenChart.destroy();
+                            fullscreenChart = null;
+                        }
+                    }
+                });
+
+                // Histogram fullscreen button
+                histogramBtn.addEventListener('click', function() {
+                    showFullscreenChart('histogram');
+                });
+
+                // Evolution fullscreen button
+                evolutionBtn.addEventListener('click', function() {
+                    showFullscreenChart('evolution');
+                });
+
+                // Function to display chart in fullscreen
+                function showFullscreenChart(chartType) {
+                    // Set modal title
+                    if (chartType === 'histogram') {
+                        modalTitle.textContent = 'Final Bankroll Distribution';
+                    } else {
+                        modalTitle.textContent = 'Bankroll Evolution';
+                    }
+
+                    // Clear previous chart
+                    if (fullscreenChart) {
+                        fullscreenChart.destroy();
+                    }
+
+                    // Show modal
+                    modal.classList.remove('hidden');
+
+                    // Get the source chart data and options
+                    const sourceChart = chartType === 'histogram' ? histogramChart : evolutionChart;
+                    if (!sourceChart) {
+                        console.error('Source chart not found');
+                        return;
+                    }
+
+                    // Prepare new chart options based on the original
+                    const newOptions = {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            tooltip: sourceChart.options.plugins.tooltip,
+                            legend: {
+                                ...sourceChart.options.plugins.legend,
+                                position: chartType === 'evolution' ? 'bottom' : sourceChart.options.plugins.legend.position,
+                                labels: {
+                                    color: sourceChart.options.plugins.legend.labels?.color || Chart.defaults.color,
+                                    font: {
+                                        size: 14
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            x: {
+                                ...sourceChart.options.scales.x,
+                                title: {
+                                    ...sourceChart.options.scales.x.title,
+                                    font: {
+                                        size: 16
+                                    }
+                                },
+                                ticks: {
+                                    ...sourceChart.options.scales.x.ticks,
+                                    maxRotation: chartType === 'histogram' ? 45 : 0,
+                                    font: {
+                                        size: 14
+                                    }
+                                }
+                            },
+                            y: {
+                                ...sourceChart.options.scales.y,
+                                title: {
+                                    ...sourceChart.options.scales.y.title,
+                                    font: {
+                                        size: 16
+                                    }
+                                },
+                                ticks: {
+                                    ...sourceChart.options.scales.y.ticks,
+                                    font: {
+                                        size: 14
+                                    }
+                                }
+                            }
+                        }
+                    };
+
+                    // Create the fullscreen chart with the same data but new options
+                    fullscreenChart = new Chart(fullscreenCanvas, {
+                        type: sourceChart.config.type,
+                        data: sourceChart.data,
+                        options: newOptions
+                    });
+                }
+            }
+
+            // Tab Switching Logic
+            tabElements.calculatorTab.addEventListener('click', function() {
+                // Hide other tab content
+                tabElements.simulation.classList.add('hidden');
+                // Show this tab content
+                tabElements.calculator.classList.remove('hidden');
+                // Update active tab indicator
+                tabElements.calculatorTab.classList.add('border-primary', 'text-primary');
+                tabElements.simulationTab.classList.remove('border-primary', 'text-primary');
+                tabElements.simulationTab.classList.add('border-transparent');
+            });
+
+            tabElements.simulationTab.addEventListener('click', function() {
+                // Hide other tab content
+                tabElements.calculator.classList.add('hidden');
+                // Show this tab content
+                tabElements.simulation.classList.remove('hidden');
+                // Update active tab indicator
+                tabElements.simulationTab.classList.add('border-primary', 'text-primary');
+                tabElements.calculatorTab.classList.remove('border-primary', 'text-primary');
+                tabElements.calculatorTab.classList.add('border-transparent');
+            });
+
+            // Link p and q values
+            formElements.p.addEventListener('input', function() {
+                if (this.value === "" || isNaN(this.value)) {
+                    formElements.q.value = "";
+                    return;
+                }
+                const pValue = parseFloat(this.value);
+                if (pValue >= 0 && pValue <= 1) {
+                    formElements.q.value = (1 - pValue).toFixed(2);
+                }
+            });
+
+            formElements.q.addEventListener('input', function() {
+                if (this.value === "" || isNaN(this.value)) {
+                    formElements.p.value = "";
+                    return;
+                }
+                const qValue = parseFloat(this.value);
+                if (qValue >= 0 && qValue <= 1) {
+                    formElements.p.value = (1 - qValue).toFixed(2);
+                }
+            });
+
+            // Calculate button click
+            formElements.calculateBtn.addEventListener('click', calculateKelly);
+
+            // Reset button click
+            formElements.resetBtn.addEventListener('click', function() {
+                formElements.f.value = "";
+                formElements.b.value = "";
+                formElements.p.value = "";
+                formElements.q.value = "";
+                formElements.result.classList.add('hidden');
+                formElements.error.classList.add('hidden');
+                setExampleValues();
+            });
+
+            // Run Simulation button click
+            simulationElements.runSimulationBtn.addEventListener('click', runSimulation);
+
+            // Reset Simulation button click
+            simulationElements.resetSimulationBtn.addEventListener('click', function() {
+                simulationElements.kellyFraction.value = "";
+                simulationElements.targetBankroll.value = "";
+                simulationElements.initialBankroll.value = "1000";
+                simulationElements.numBets.value = "100";
+                simulationElements.numSimulations.value = "1000";
+                simulationElements.simulationError.classList.add('hidden');
+                simulationElements.simulationProgress.classList.add('hidden');
+                simulationElements.simulationResults.classList.add('hidden');
+                simulationElements.targetProbabilityContainer.classList.add('hidden');
+
+                // Clear charts
+                if (histogramChart) {
+                    histogramChart.destroy();
+                    histogramChart = null;
+                }
+                if (evolutionChart) {
+                    evolutionChart.destroy();
+                    evolutionChart = null;
+                }
+            });
+
+            function calculateKelly() {
+                // Hide previous results/errors
+                formElements.result.classList.add('hidden');
+                formElements.error.classList.add('hidden');
+                formElements.resultWarning.classList.add('hidden');
+
+                // Get values from inputs
+                const values = {
+                    f: formElements.f.value === "" ? null : parseFloat(formElements.f.value),
+                    b: formElements.b.value === "" ? null : parseFloat(formElements.b.value),
+                    p: formElements.p.value === "" ? null : parseFloat(formElements.p.value),
+                    q: formElements.q.value === "" ? null : parseFloat(formElements.q.value)
+                };
+
+                // Count empty fields
+                const emptyFields = Object.values(values).filter(val => val === null).length;
+
+                // Validate inputs
+                try {
+                    // Ensure p and q are linked
+                    if (values.p !== null && values.q !== null && Math.abs(values.p + values.q - 1) > 0.001) {
+                        throw new Error("Probability of winning (p) and losing (q) must sum to 1.");
+                    }
+
+                    // Check if too many or too few fields are empty
+                    if (emptyFields > 1) {
+                        throw new Error("Please fill at least three fields to calculate the missing value.");
+                    }
+                    if (emptyFields === 0) {
+                        throw new Error("Please leave one field blank to calculate its value.");
+                    }
+
+                    // Validate ranges
+                    if (values.f !== null && (values.f < 0 || values.f > 1)) {
+                        throw new Error("Fraction to bet (f) must be between 0 and 1.");
+                    }
+                    if (values.b !== null && values.b < 0) {
+                        throw new Error("Net odds (b) must be non-negative.");
+                    }
+                    if (values.p !== null && (values.p < 0 || values.p > 1)) {
+                        throw new Error("Probability of winning (p) must be between 0 and 1.");
+                    }
+                    if (values.q !== null && (values.q < 0 || values.q > 1)) {
+                        throw new Error("Probability of losing (q) must be between 0 and 1.");
+                    }
+
+                    // Perform calculation based on which field is empty
+                    let result, calculatedField;
+
+                    if (values.f === null) {
+                        // Calculate f using: f = (b * p - q) / b
+                        result = (values.b * values.p - values.q) / values.b;
+                        calculatedField = "f";
+                        formElements.f.value = result.toFixed(4);
+                    } else if (values.b === null) {
+                        // Calculate b using: b = q / (p - f)
+                        const denominator = values.p - values.f;
+                        if (Math.abs(denominator) < 0.000001) {
+                            throw new Error("Cannot calculate net odds (b): p - f is too close to zero.");
+                        }
+                        result = values.q / denominator;
+                        calculatedField = "b";
+                        formElements.b.value = result.toFixed(4);
+                    } else if (values.p === null || values.q === null) {
+                        // Calculate p using: p = (f * b + q) / (b + 1)
+                        // Since we know p + q = 1, we can substitute q = 1 - p
+                        // This gives: p = (f * b + (1 - p)) / (b + 1)
+                        result = (values.f * values.b + values.q) / (values.b + 1);
+                        calculatedField = "p";
+                        formElements.p.value = result.toFixed(4);
+                        formElements.q.value = (1 - result).toFixed(4);
+                    }
+
+                    // Format the output message
+                    let fieldName, formattedResult;
+                    switch (calculatedField) {
+                        case "f":
+                            fieldName = "Optimal fraction to bet";
+                            formattedResult = `${(result * 100).toFixed(2)}%`;
+                            break;
+                        case "b":
+                            fieldName = "Net odds";
+                            formattedResult = result.toFixed(2);
+                            break;
+                        case "p":
+                            fieldName = "Probability of winning";
+                            formattedResult = `${(result * 100).toFixed(2)}%`;
+                            break;
+                    }
+
+                    // Display the result
+                    formElements.resultText.textContent = `${fieldName}: ${formattedResult}`;
+                    formElements.result.classList.remove('hidden');
+
+                    // Add warning if necessary (for f calculation)
+                    if (calculatedField === "f") {
+                        if (result <= 0) {
+                            formElements.resultWarning.textContent = "Warning: Calculated fraction is negative or zero. This suggests you should not bet (no edge).";
+                            formElements.resultWarning.classList.remove('hidden');
+                        } else if (result >= 1) {
+                            formElements.resultWarning.textContent = "Warning: Calculated fraction exceeds 100%. This suggests extreme caution as there is a high risk of ruin.";
+                            formElements.resultWarning.classList.remove('hidden');
+                        } else if (result > 0.5) {
+                            formElements.resultWarning.textContent = "Caution: Betting more than 50% of your bankroll can lead to high volatility. Consider using a fractional Kelly approach.";
+                            formElements.resultWarning.classList.remove('hidden');
+                        }
+                    }
+
+                } catch (err) {
+                    // Display error message
+                    formElements.errorText.textContent = err.message;
+                    formElements.error.classList.remove('hidden');
+                }
+            }
+
+            function runSimulation() {
+                // Hide previous results/errors and show progress
+                simulationElements.simulationError.classList.add('hidden');
+                simulationElements.simulationResults.classList.add('hidden');
+                simulationElements.simulationProgress.classList.remove('hidden');
+                simulationElements.targetProbabilityContainer.classList.add('hidden');
+
+                // Update progress bar
+                simulationElements.simulationProgressBar.style.width = '0%';
+                simulationElements.simulationProgressText.textContent = '0%';
+
+                // Get values from inputs
+                const values = {
+                    initialBankroll: parseFloat(simulationElements.initialBankroll.value),
+                    numBets: parseInt(simulationElements.numBets.value),
+                    numSimulations: parseInt(simulationElements.numSimulations.value),
+                    kellyFraction: simulationElements.kellyFraction.value === "" ? null : parseFloat(simulationElements.kellyFraction.value),
+                    targetBankroll: simulationElements.targetBankroll.value === "" ? null : parseFloat(simulationElements.targetBankroll.value),
+                    b: parseFloat(formElements.b.value || "0"),
+                    p: parseFloat(formElements.p.value || "0"),
+                    q: parseFloat(formElements.q.value || "0"),
+                    f: parseFloat(formElements.f.value || "0")
+                };
+
+                // Validate inputs
+                try {
+                    if (isNaN(values.initialBankroll) || values.initialBankroll <= 0) {
+                        throw new Error("Initial bankroll must be a positive number.");
+                    }
+                    if (isNaN(values.numBets) || values.numBets <= 0 || values.numBets > 1000) {
+                        throw new Error("Number of bets must be between 1 and 1000.");
+                    }
+                    if (isNaN(values.numSimulations) || values.numSimulations <= 0 || values.numSimulations > 10000) {
+                        throw new Error("Number of simulations must be between 1 and 10000.");
+                    }
+                    if (values.kellyFraction !== null && (values.kellyFraction < 0 || values.kellyFraction > 2)) {
+                        throw new Error("Kelly fraction must be between 0 and 2.");
+                    }
+                    if (values.targetBankroll !== null && values.targetBankroll <= 0) {
+                        throw new Error("Target bankroll must be a positive number.");
+                    }
+
+                    // Calculate Kelly value if not provided
+                    if (isNaN(values.f) || values.f === 0) {
+                        if (isNaN(values.b) || values.b <= 0) {
+                            throw new Error("Net odds (b) must be a positive number for simulation.");
+                        }
+                        if (isNaN(values.p) || values.p <= 0 || values.p >= 1) {
+                            throw new Error("Probability of winning (p) must be between 0 and 1 for simulation.");
+                        }
+                        if (isNaN(values.q) || values.q <= 0 || values.q >= 1) {
+                            throw new Error("Probability of losing (q) must be between 0 and 1 for simulation.");
+                        }
+                        // Calculate optimal f using: f = (b * p - q) / b
+                        values.f = (values.b * values.p - values.q) / values.b;
+                    }
+
+                    // Apply custom Kelly fraction if provided
+                    if (values.kellyFraction !== null) {
+                        values.f *= values.kellyFraction;
+                    }
+
+                    // Don't allow negative bet sizes
+                    if (values.f < 0) {
+                        values.f = 0;
+                    }
+
+                    // Run the simulation
+                    setTimeout(() => {
+                        performMonteCarlo(values);
+                    }, 100); // Small delay to allow UI to update
+
+                } catch (err) {
+                    // Display error message
+                    simulationElements.simulationErrorText.textContent = err.message;
+                    simulationElements.simulationError.classList.remove('hidden');
+                    simulationElements.simulationProgress.classList.add('hidden');
+                }
+            }
+
+            function performMonteCarlo(values) {
+                // Variables for simulation
+                const initialBankroll = values.initialBankroll;
+                const numBets = values.numBets;
+                const numSimulations = values.numSimulations;
+                const f = values.f;
+                const p = values.p;
+                const b = values.b;
+                const targetBankroll = values.targetBankroll;
+
+                // Arrays to store results
+                const finalBankrolls = [];
+                const allBankrollPaths = [];
+                let targetReached = 0;
+
+                // Batch processing for better UI responsiveness
+                const batchSize = Math.min(100, numSimulations);
+                let processedSimulations = 0;
+
+                // Process simulations in batches
+                function processBatch() {
+                    const batchEnd = Math.min(processedSimulations + batchSize, numSimulations);
+
+                    for (let sim = processedSimulations; sim < batchEnd; sim++) {
+                        let bankroll = initialBankroll;
+                        const bankrollPath = [bankroll];
+                        let reachedTarget = false;
+
+                        for (let bet = 0; bet < numBets; bet++) {
+                            // Skip if bankroll is 0 or extremely small
+                            if (bankroll <= 0.01) {
+                                bankroll = 0;
+                                bankrollPath.push(bankroll);
+                                continue;
+                            }
+
+                            // Calculate bet amount
+                            const betAmount = bankroll * f;
+
+                            // Determine win/loss for this bet
+                            const randomValue = Math.random();
+                            if (randomValue < p) {
+                                // Win
+                                bankroll += betAmount * b;
+                            } else {
+                                // Loss
+                                bankroll -= betAmount;
+                            }
+
+                            // Record bankroll after this bet
+                            bankrollPath.push(bankroll);
+
+                            // Check if target reached
+                            if (targetBankroll !== null && !reachedTarget && bankroll >= targetBankroll) {
+                                reachedTarget = true;
+                            }
+                        }
+
+                        // Record final results
+                        finalBankrolls.push(bankroll);
+                        allBankrollPaths.push(bankrollPath);
+                        if (reachedTarget) {
+                            targetReached++;
+                        }
+                    }
+
+                    // Update progress
+                    processedSimulations = batchEnd;
+                    const progress = Math.round((processedSimulations / numSimulations) * 100);
+                    simulationElements.simulationProgressBar.style.width = `${progress}%`;
+                    simulationElements.simulationProgressText.textContent = `${progress}%`;
+
+                    if (processedSimulations < numSimulations) {
+                        // Process next batch
+                        setTimeout(processBatch, 0);
+                    } else {
+                        // All simulations done, display results
+                        displayResults(finalBankrolls, allBankrollPaths, targetReached, values);
+                    }
+                }
+
+                // Start processing batches
+                processBatch();
+            }
+
+            function displayResults(finalBankrolls, allBankrollPaths, targetReached, values) {
+                // Calculate statistics
+                const average = finalBankrolls.reduce((a, b) => a + b, 0) / finalBankrolls.length;
+                const sortedResults = [...finalBankrolls].sort((a, b) => a - b);
+                const median = sortedResults[Math.floor(sortedResults.length / 2)];
+
+                // Calculate standard deviation
+                const variance = finalBankrolls.reduce((acc, val) => acc + Math.pow(val - average, 2), 0) / finalBankrolls.length;
+                const stdDev = Math.sqrt(variance);
+
+                // Update summary statistics
+                simulationElements.summaryInitial.textContent = `$${values.initialBankroll.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+                simulationElements.summaryKelly.textContent = `${(values.f * 100).toFixed(1)}%`;
+                simulationElements.summaryAverage.textContent = `$${average.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+                simulationElements.summaryMedian.textContent = `$${median.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+                simulationElements.summaryStddev.textContent = `$${stdDev.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+
+                // Target probability
+                if (values.targetBankroll !== null) {
+                    const targetProbability = targetReached / finalBankrolls.length;
+                    simulationElements.summaryTargetProb.textContent = `${(targetProbability * 100).toFixed(1)}%`;
+                    simulationElements.targetProbabilityContainer.classList.remove('hidden');
+                } else {
+                    simulationElements.targetProbabilityContainer.classList.add('hidden');
+                }
+
+                // Create histogram of final bankrolls
+                createHistogram(finalBankrolls, values.initialBankroll);
+
+                // Create bankroll evolution chart
+                createEvolutionChart(allBankrollPaths, values.initialBankroll);
+
+                // Show results section, hide progress
+                simulationElements.simulationProgress.classList.add('hidden');
+                simulationElements.simulationResults.classList.remove('hidden');
+            }
+
+            function createHistogram(finalBankrolls, initialBankroll) {
+                // Determine number of bins
+                const numBins = Math.min(20, Math.ceil(Math.sqrt(finalBankrolls.length)));
+
+                // Find min and max values
+                const minValue = Math.min(...finalBankrolls);
+                const maxValue = Math.max(...finalBankrolls);
+
+                // Create bins
+                const binWidth = (maxValue - minValue) / numBins;
+                const bins = Array(numBins).fill(0);
+                const binLabels = [];
+
+                // Create bin labels
+                for (let i = 0; i < numBins; i++) {
+                    const binStart = minValue + i * binWidth;
+                    const binEnd = binStart + binWidth;
+                    binLabels.push(`$${binStart.toFixed(0)}-$${binEnd.toFixed(0)}`);
+                }
+
+                // Count occurrences in each bin
+                finalBankrolls.forEach(value => {
+                    const binIndex = Math.min(
+                        numBins - 1,
+                        Math.floor((value - minValue) / binWidth)
+                    );
+                    bins[binIndex]++;
+                });
+
+                // Clear previous chart if exists
+                if (histogramChart) {
+                    histogramChart.destroy();
+                }
+
+                // Determine colors for dark/light mode
+                const isDark = document.documentElement.classList.contains('dark');
+                const textColor = isDark ? '#E5E7EB' : '#1F2937';
+                const gridColor = isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
+
+                // Create chart
+                histogramChart = new Chart(simulationElements.resultHistogram, {
+                    type: 'bar',
+                    data: {
+                        labels: binLabels,
+                        datasets: [{
+                            label: 'Frequency',
+                            data: bins,
+                            backgroundColor: '#5D5CDE',
+                            borderColor: '#4B48DA',
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                display: false
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    title: function(tooltipItems) {
+                                        return tooltipItems[0].label;
+                                    },
+                                    label: function(context) {
+                                        return `${context.parsed.y} simulations (${(context.parsed.y / finalBankrolls.length * 100).toFixed(1)}%)`;
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            x: {
+                                title: {
+                                    display: true,
+                                    text: 'Final Bankroll',
+                                    color: textColor
+                                },
+                                grid: {
+                                    display: false,
+                                    color: gridColor
+                                },
+                                ticks: {
+                                    maxRotation: 45,
+                                    minRotation: 45,
+                                    color: textColor
+                                }
+                            },
+                            y: {
+                                title: {
+                                    display: true,
+                                    text: 'Frequency',
+                                    color: textColor
+                                },
+                                grid: {
+                                    color: gridColor
+                                },
+                                ticks: {
+                                    color: textColor
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+
+            function createEvolutionChart(allBankrollPaths, initialBankroll) {
+                // Determine number of paths to display
+                const numPaths = Math.min(10, allBankrollPaths.length);
+                const pathIndices = [];
+
+                // Select evenly spaced paths
+                for (let i = 0; i < numPaths; i++) {
+                    pathIndices.push(Math.floor(i * allBankrollPaths.length / numPaths));
+                }
+
+                // Create labels for bets
+                const numBets = allBankrollPaths[0].length;
+                const labels = [];
+                for (let i = 0; i < numBets; i++) {
+                    labels.push(`Bet ${i}`);
+                }
+
+                // Create datasets
+                const datasets = [];
+
+                // Add representative paths
+                pathIndices.forEach((index, i) => {
+                    datasets.push({
+                        label: `Simulation ${index + 1}`,
+                        data: allBankrollPaths[index],
+                        borderColor: `hsl(${240 + (i * 360 / numPaths)}, 70%, 60%)`,
+                        backgroundColor: 'transparent',
+                        borderWidth: 1,
+                        pointRadius: 0
+                    });
+                });
+
+                // Calculate average path
+                const avgPath = [];
+                for (let bet = 0; bet < numBets; bet++) {
+                    let sum = 0;
+                    for (let sim = 0; sim < allBankrollPaths.length; sim++) {
+                        sum += allBankrollPaths[sim][bet];
+                    }
+                    avgPath.push(sum / allBankrollPaths.length);
+                }
+
+                // Add average path
+                datasets.push({
+                    label: 'Average',
+                    data: avgPath,
+                    borderColor: '#5D5CDE',
+                    backgroundColor: 'transparent',
+                    borderWidth: 3,
+                    pointRadius: 0
+                });
+
+                // Add initial bankroll reference line
+                datasets.push({
+                    label: 'Initial Bankroll',
+                    data: Array(numBets).fill(initialBankroll),
+                    borderColor: '#FFA500',
+                    borderWidth: 2,
+                    borderDash: [5, 5],
+                    pointRadius: 0
+                });
+
+                // Clear previous chart if exists
+                if (evolutionChart) {
+                    evolutionChart.destroy();
+                }
+
+                // Determine colors for dark/light mode
+                const isDark = document.documentElement.classList.contains('dark');
+                const textColor = isDark ? '#E5E7EB' : '#1F2937';
+                const gridColor = isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
+
+                // Create chart
+                evolutionChart = new Chart(simulationElements.bankrollEvolution, {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: datasets
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            tooltip: {
+                                mode: 'index',
+                                intersect: false
+                            },
+                            legend: {
+                                display: true,
+                                position: 'top',
+                                labels: {
+                                    color: textColor
+                                }
+                            }
+                        },
+                        scales: {
+                            x: {
+                                title: {
+                                    display: true,
+                                    text: 'Bet Number',
+                                    color: textColor
+                                },
+                                grid: {
+                                    color: gridColor
+                                },
+                                ticks: {
+                                    color: textColor,
+                                    // Only show few labels for clarity
+                                    maxTicksLimit: 10
+                                }
+                            },
+                            y: {
+                                title: {
+                                    display: true,
+                                    text: 'Bankroll ($)',
+                                    color: textColor
+                                },
+                                grid: {
+                                    color: gridColor
+                                },
+                                ticks: {
+                                    color: textColor
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+        });
+    </script>
+</body>
+</html>
